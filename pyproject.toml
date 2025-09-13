@@ -1,0 +1,26 @@
+[project]
+name = "hydlpy"
+version = "0.1.0"
+description = "A short description of your package"
+authors = [
+    { name = "Your Name", email = "your.email@example.com" }
+]
+readme = "README.md"  # Path to your README file
+license = { text = "MIT" }  # Or your chosen license
+requires-python = ">=3.11"  # Minimum Python version
+dependencies = [
+    "pydantic>=2.11.7",
+    "pytorch-lightning>=2.5.5",
+    "rich>=14.1.0",
+    "sympy>=1.14.0",
+    "torch>=2.8.0",
+]  # Add runtime dependencies here
+
+# [build-system]
+# requires = ["hatchling"]  # Build backend (hatchling is common with uv)
+# build-backend = "hatchling.build"
+
+[project.urls]
+Homepage = "https://github.com/chooron/hydlpy"  # Optional
+Documentation = "https://hydlpy.readthedocs.io"  # Optional
+Repository = "https://github.com/chooron/hydlpy"  # Optional
