@@ -8,7 +8,7 @@ import torch
 from .factory import (create_dynamic_parameter_estimator,
                       create_hydrology_core, create_routing_module,
                       create_static_parameter_estimator)
-from .hydrology_cores.base import BaseHydrologyModel
+from .hydrology_cores.base import HydrologyModel
 from .utils.metrics import LogNSELoss
 
 
@@ -38,7 +38,7 @@ class DplHydroModel(pl.LightningModule):
         self.dynamic_param_estimator = create_dynamic_parameter_estimator(
             self.hparams.get("dynamic_parameter_estimator")
         )
-        self.hydrology_core: BaseHydrologyModel = create_hydrology_core(
+        self.hydrology_core: HydrologyModel = create_hydrology_core(
             self.hparams.get("hydrology")
         )
         self.routing_module = create_routing_module(self.hparams.get("routing"))
