@@ -9,13 +9,10 @@ readme = "README.md"  # Path to your README file
 license = { text = "MIT" }  # Or your chosen license
 requires-python = ">=3.11"  # Minimum Python version
 dependencies = [
-    "pandas>=2.3.3",
-    "pydantic>=2.11.7",
-    "pytest>=8.4.2",
-    "pytorch-lightning>=2.5.5",
-    "rich>=14.1.0",
-    "sympy>=1.14.0",
-    "torch>=2.8.0",
+    "pydantic~=2.11",
+    "pytorch-lightning~=2.5",
+    "sympy~=1.14",
+    "torch~=2.8",
 ]  # Add runtime dependencies here
 
 classifiers = [
@@ -24,6 +21,11 @@ classifiers = [
     "Operating System :: OS Independent",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
+
+# [project.optional-dependencies]
+# test = [
+#     "pytest~=8.4",
+# ]
 
 [build-system]
 requires = ["hatchling"]  # Build backend (hatchling is common with uv)

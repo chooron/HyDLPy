@@ -4,10 +4,10 @@ import pickle
 from typing import Any, Optional, Dict
 
 import numpy as np
-import pandas as pd
 import torch
 import pytorch_lightning as pl
 from numpy.typing import NDArray
+from datetime import datetime, timedelta
 from torch.utils.data import DataLoader
 
 from .dataset import HydroDataset 
@@ -114,11 +114,14 @@ class HydroDataModule(pl.LightningDataModule):
         else:
             raise ValueError("Scope must be 'train' or 'test'.")
 
-        all_time = pd.date_range(
-            self.config['all_time'][0], self.config['all_time'][-1], freq='d'
-        )
-        idx_start = all_time.get_loc(time[0])
-        idx_end = all_time.get_loc(time[-1]) + 1
+        start_date_all = datetime.strptime(self.config['all_time'][0], "%Y-%m-%d")
+        end_date_all = datetime.strptime(self.config['all_time'][-1], "%Y-%m-%d")
+
+        num_days = (end_date_all - start_date_all).days + 1
+        all_time = [start_date_all + timedelta(days=i) for i in range(num_days)]
+
+        idx_start = all_time.index(datetime.strptime(time[0], "%Y-%m-%d"))
+        idx_end = all_time.index(datetime.strptime(time[-1], "%Y-%m-%d")) + 1
 
         with open(path, 'rb') as f:
             forcings, target, attributes = pickle.load(f)
