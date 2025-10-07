@@ -17,6 +17,8 @@
 
 **HyDLPy** is a cutting-edge Python framework that seamlessly integrates traditional process-based hydrological models with modern deep learning techniques. Built on PyTorch and PyTorch Lightning, it enables researchers and practitioners to construct hybrid models that combine the interpretability of physics-based approaches with the flexibility and predictive power of neural networks.
 
+**⚠️ WARNING: This is a private library for internal use only. It is highly unstable and the API is subject to change without notice. DO NOT USE IN PRODUCTION.**
+
 ### 🎯 Key Features
 
 - **🔬 Symbolic Model Definition**: Define hydrological processes using SymPy equations with automatic compilation to PyTorch
