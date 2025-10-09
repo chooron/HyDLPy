@@ -5,7 +5,7 @@ from sympy.utilities.lambdify import lambdify
 from sympy.printing.pytorch import TorchPrinter
 from typing import Callable, Dict, List, Optional, Tuple
 from collections import deque
-from .symbol_toolkit import is_parameter
+from .symbol_toolkit import is_parameter, SympyFunction
 
 
 # Helper function to ensure inputs to min/max are Tensors
@@ -68,11 +68,13 @@ class HydrologicalModel(nn.Module):
         dfluxes: List[Eq],
         nns: Optional[Dict[str, nn.Module]] = None,
         hidden_size: int = 1,
+        dtype: torch.dtype = torch.float32,
     ):
         super().__init__()
         self.flux_eqs = fluxes
         self.dflux_eqs = dfluxes
         self.hidden_size = hidden_size
+        self.dtype = dtype
         self.nns = nn.ModuleDict(nns or {})
         self.lambdify_modules_map = TORCH_EXTEND_MODULE.copy()
 
@@ -90,8 +92,12 @@ class HydrologicalModel(nn.Module):
 
         self._initialize_model(fluxes, dfluxes)
         self._initialize_parameters()
-        self.flux_calculator = self._compile_flux_calculator(fluxes)
-        self.state_updater = self._compile_state_updater(dfluxes)
+        self.flux_calculator = SympyFunction(
+            self._compile_flux_calculator(fluxes), "flux_calculator"
+        )
+        self.state_updater = SympyFunction(
+            self._compile_state_updater(dfluxes), "state_updater"
+        )
 
     def _topologically_sort_fluxes(
         self, flux_symbols_set: set, symbolic_fluxes: Dict
@@ -177,7 +183,7 @@ class HydrologicalModel(nn.Module):
             min_bounds_list.append(min_b)
             max_bounds_list.append(max_b)
             initial_tensor = torch.full(
-                (self.hidden_size,), float(initial_value), dtype=torch.float32
+                (self.hidden_size,), float(initial_value), dtype=self.dtype
             )
             unconstrained_values = torch.logit(
                 (initial_tensor - min_b) / (max_b - min_b)
@@ -185,11 +191,24 @@ class HydrologicalModel(nn.Module):
             setattr(self, s.name, nn.Parameter(unconstrained_values))
 
         self.register_buffer(
-            "min_bounds", torch.tensor(min_bounds_list, dtype=torch.float32)
+            "min_bounds", torch.tensor(min_bounds_list, dtype=self.dtype)
         )
         self.register_buffer(
-            "max_bounds", torch.tensor(max_bounds_list, dtype=torch.float32)
+            "max_bounds", torch.tensor(max_bounds_list, dtype=self.dtype)
         )
+
+    def _get_initial_state(self) -> torch.Tensor:
+        """
+        Returns the initial state of the model.
+
+        The initial state is a PyTorch tensor of shape (hidden_size, num_state_variables).
+        By default, all state variables are initialized to 0.0.
+
+        Returns:
+            torch.Tensor: A tensor representing the initial state.
+        """
+        num_state_variables = len(self.state_names)
+        return torch.zeros(self.hidden_size, num_state_variables, dtype=self.dtype)
 
     def _compile_flux_calculator(self, fluxes: List[Eq]):
         """Compiles the flux equations into a callable PyTorch function."""
@@ -209,7 +228,6 @@ class HydrologicalModel(nn.Module):
         return lambdify(
             input_symbols,
             final_flux_exprs,
-            # cse=True,
             modules=[self.lambdify_modules_map, "torch"],
             printer=TorchPrinter({"strict": False}),
         )
@@ -228,31 +246,71 @@ class HydrologicalModel(nn.Module):
         return lambdify(
             input_symbols,
             next_state_exprs,
-            # cse=True,
             modules=[self.lambdify_modules_map, "torch"],
             printer=TorchPrinter({"strict": False}),
         )
 
-    def _transform_params(self, unconstrained_params: torch.Tensor) -> torch.Tensor:
+    def _transform_parameters(self, unconstrained_params: torch.Tensor) -> torch.Tensor:
         """Transforms a tensor of unconstrained parameters to their bounded physical values."""
         sigmoid_params = torch.sigmoid(unconstrained_params)
         return self.min_bounds + (self.max_bounds - self.min_bounds) * sigmoid_params
 
-    def forward(
+    def _core(
         self,
         forcings: torch.Tensor,
         states: torch.Tensor,
-        parameters: Optional[torch.Tensor] = None,
+        parameters: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Executes one time step for multiple parallel units (HRUs).
         """
+        forcing_values = forcings.unbind(-1)
+        state_values = states.unbind(-1)
+        param_values = parameters.unbind(-1)
+
+        flux_outputs_tuple = self.flux_calculator(
+            state_values, forcing_values, param_values
+        )
+        flux_outputs = torch.stack(flux_outputs_tuple, dim=-1)
+
+        flux_values = flux_outputs.unbind(-1)
+        new_states_tuple = self.state_updater(
+            state_values, flux_values, forcing_values, param_values
+        )
+        new_states = torch.stack(new_states_tuple, dim=-1)
+
+        torch.clamp_(new_states, min=0.0)
+
+        return flux_outputs, new_states
+
+    def _process_parameters(
+        self,
+        parameters: Optional[torch.Tensor],
+        forcings_shape: Tuple[int, int, int, int],
+        device: torch.device,
+    ) -> torch.Tensor:
+        """
+        Validates, transforms, and prepares model parameters for the simulation loop.
+
+        Args:
+            parameters: An optional tensor of external parameters. If None, uses internal model parameters.
+            timelen: The length of the time dimension for the simulation.
+            device: The torch device (e.g., 'cpu' or 'cuda') to place new tensors on.
+
+        Returns:
+            A tensor of transformed parameters ready for the simulation, with a time dimension.
+        """
+        T, B, H, F = forcings_shape
         unconstrained_params: torch.Tensor
         if parameters is not None:
-            expected_shape = (self.hidden_size, len(self.parameter_names))
-            if parameters.shape != expected_shape:
+            expected_dynamic_shape = (T, B, H, len(self.parameter_names))
+            expected_static_shape = (B, H, len(self.parameter_names))
+            if (parameters.shape != expected_dynamic_shape) & (
+                parameters.shape != expected_static_shape
+            ):
                 raise ValueError(
-                    f"Provided parameters have shape {parameters.shape}, but expected {expected_shape}"
+                    f"Provided parameters have shape {parameters.shape}, "
+                    + f"but expected dynamic shape: {expected_dynamic_shape} or static shape: {expected_static_shape}"
                 )
             unconstrained_params = parameters
         else:
@@ -260,29 +318,69 @@ class HydrologicalModel(nn.Module):
                 getattr(self, name) for name in self.parameter_names
             ]
             if not internal_params_list:
-                unconstrained_params = torch.empty(
-                    self.hidden_size, 0, device=states.device
-                )
+                # Create an empty tensor if there are no parameters
+                unconstrained_params = torch.empty(self.hidden_size, 0, device=device)
             else:
                 unconstrained_params = torch.stack(internal_params_list, dim=1)
 
-        params: torch.Tensor = self._transform_params(unconstrained_params)
-
-        state_values = states.unbind(1)
-        forcing_values = forcings.unbind(1)
-        param_values = params.unbind(1)
-
-        flux_outputs_tuple = self.flux_calculator(
-            state_values, forcing_values, param_values
+        # Apply transformations (e.g., sigmoid) to ensure parameters are in a valid range
+        transformed_parameters: torch.Tensor = self._transform_parameters(
+            unconstrained_params
         )
-        flux_outputs = torch.stack(flux_outputs_tuple, dim=1)
 
-        flux_values = flux_outputs.unbind(1)
-        new_states_tuple = self.state_updater(
-            state_values, flux_values, forcing_values, param_values
+        # Ensure parameters have a time dimension, repeating if they are static
+        if len(transformed_parameters.shape) == 4:
+            pass
+        elif len(transformed_parameters.shape) == 3:
+            transformed_parameters = transformed_parameters.unsqueeze(0).repeat(
+                T, 1, 1, 1
+            )
+        return transformed_parameters
+
+    def forward(
+        self,
+        forcings: torch.Tensor,
+        states: Optional[torch.Tensor] = None,
+        parameters: Optional[torch.Tensor] = None,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Runs the full time-series simulation.
+
+        Args:
+            forcings: A tensor of input forcing data with shape [T, B, H, F],
+                      where T=time, B=basins, H=HRUs, F=features.
+            states: A tensor of the initial system states with shape [B, H, S],
+                    where S is the number of states.
+            parameters: An optional tensor of model parameters to override internal ones.
+
+        Returns:
+            A tuple containing:
+            - torch.Tensor: The time series of calculated fluxes.
+            - torch.Tensor: The time series of simulated states.
+        """
+        # time step, basin num, hru num, feature dim
+        T, B, H, F = forcings.shape
+
+        # Correctly get device from an existing tensor
+        device = forcings.device
+
+        transformed_parameters = self._process_parameters(parameters, forcings.shape, device)
+
+        fluxes_placeholder = torch.zeros((T, B, H, len(self.flux_names)), device=device)
+        states_placeholder = torch.zeros(
+            (T, B, H, len(self.state_names)), device=device
         )
-        new_states = torch.stack(new_states_tuple, dim=1)
 
-        torch.clamp_(new_states, min=0.0)
+        if states is None:
+            states = self._get_initial_state()
+        current_states = torch.clone(states)
 
-        return flux_outputs, new_states
+        for i in range(T):
+            fluxes_, states_ = self._core(
+                forcings[i, :, :, :], current_states, transformed_parameters[i, :, :, :]
+            )
+            fluxes_placeholder[i, :, :, :] = fluxes_
+            states_placeholder[i, :, :, :] = states_
+            current_states = states_  # Update states for the next iteration
+
+        return fluxes_placeholder, states_placeholder

@@ -95,43 +95,15 @@ def test_initialization(model_equations, hidden_size):
 
 
 @pytest.mark.parametrize("hidden_size", [1, 16])
-def test_forward_for_hidden_sizes(model_equations, hidden_size):
-    """
-    Tests that the forward pass runs successfully and returns tensors with the
-    correct shapes for both single (1) and multiple (16) HRUs.
-    A fixed batch_size is used.
-    """
-    print(f"\n--- Running Test: Forward Pass (hidden_size={hidden_size}) ---")
-    fluxes, dfluxes = model_equations
-    
-    model = HydrologicalModel(fluxes=fluxes, dfluxes=dfluxes, hidden_size=hidden_size)
-
-    # 1. Prepare input tensors with the correct shapes
-    states = torch.rand(hidden_size, len(model.state_names))
-    forcings = torch.rand(hidden_size, len(model.forcing_names))
-
-    # 2. Call the model
-    output_fluxes, new_states = model(forcings, states)
-
-    # 3. Assert the shapes of the two separate output tensors
-    expected_fluxes_shape = (hidden_size, len(model.flux_names))
-    expected_states_shape = (hidden_size, len(model.state_names))
-
-    assert output_fluxes.shape == expected_fluxes_shape
-    assert new_states.shape == expected_states_shape
-
-    # 4. Check both output tensors for NaN values
-    assert not torch.isnan(output_fluxes).any()
-    assert not torch.isnan(new_states).any()
-
-@pytest.mark.parametrize("hidden_size", [1, 16])
-def test_forward_with_external_parameters(model_equations, hidden_size):
+def test_core(model_equations, hidden_size):
     """
     Tests the forward pass using an externally provided parameter tensor.
     This verifies that the model can correctly use parameter values passed at runtime,
     bypassing its internal nn.Parameter members.
     """
-    print(f"\n--- Running Test: Forward Pass with External Parameters (hidden_size={hidden_size}) ---")
+    print(
+        f"\n--- Running Test: Forward Pass with External Parameters (hidden_size={hidden_size}) ---"
+    )
     fluxes, dfluxes = model_equations
     model = HydrologicalModel(fluxes=fluxes, dfluxes=dfluxes, hidden_size=hidden_size)
 
@@ -144,11 +116,57 @@ def test_forward_with_external_parameters(model_equations, hidden_size):
     external_params = torch.rand(hidden_size, len(model.parameter_names))
 
     # 3. Call the model's forward pass, providing the external `parameters` tensor
-    output_fluxes, new_states = model(forcings, states, parameters=external_params)
+    output_fluxes, new_states = model._core(
+        forcings, states, parameters=external_params
+    )
 
     # 4. Assert that the output tensors have the correct shapes
     expected_fluxes_shape = (hidden_size, len(model.flux_names))
     expected_states_shape = (hidden_size, len(model.state_names))
+
+    assert output_fluxes.shape == expected_fluxes_shape
+    assert new_states.shape == expected_states_shape
+
+    # 5. Check for any NaN values in the output
+    assert not torch.isnan(output_fluxes).any()
+    assert not torch.isnan(new_states).any()
+
+
+@pytest.mark.parametrize(
+    ("hidden_size", "basin_num"),
+    [
+        (1, 1),
+        (16, 12),
+    ],
+)
+def test_forward(model_equations, hidden_size, basin_num):
+    """
+    Tests the forward pass using an externally provided parameter tensor.
+    This verifies that the model can correctly use parameter values passed at runtime,
+    bypassing its internal nn.Parameter members.
+    """
+    print(
+        f"\n--- Running Test: Forward Pass with External Parameters (hidden_size={hidden_size}) ---"
+    )
+    fluxes, dfluxes = model_equations
+    model = HydrologicalModel(fluxes=fluxes, dfluxes=dfluxes, hidden_size=hidden_size)
+    time_len= 365
+    # 1. Prepare input tensors for states and forcings
+    states = torch.rand(basin_num, hidden_size, len(model.state_names))
+    forcings = torch.rand(time_len, basin_num, hidden_size, len(model.forcing_names))
+
+    # 2. Create a correctly shaped external parameter tensor to override the model's internal ones
+    # The required shape is (hidden_size, num_parameters)
+    external_params = torch.rand(
+        time_len, basin_num, hidden_size, len(model.parameter_names)
+    )
+
+    # 3. Call the model's forward pass, providing the external `parameters` tensor
+    output_fluxes, new_states = model(forcings, states, external_params)
+
+    # 4. Assert that the output tensors have the correct shapes
+    expected_fluxes_shape = (time_len, basin_num, hidden_size, len(model.flux_names))
+    expected_states_shape = (time_len, basin_num, hidden_size, len(model.state_names))
 
     assert output_fluxes.shape == expected_fluxes_shape
     assert new_states.shape == expected_states_shape

@@ -4,6 +4,16 @@ import torch
 import torch.nn as nn
 
 
+class BaseRouting(nn.Module):
+    """
+    routing 需要考虑两种数据情况
+    1. 考虑有拓扑关系的输入,比如河网,流向矩阵等
+    2. 不考虑拓扑关系的输入,直接输出结果
+    """
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+
 class MeanRouting(nn.Module):
     """
     Simplest routing: assumes runoff from the core model is already aggregated

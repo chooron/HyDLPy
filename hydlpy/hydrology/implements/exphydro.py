@@ -33,26 +33,17 @@ class ExpHydro(HydrologicalModel):
         # --- Define State and Forcing Variables ---
         temp = HydroVariable("temp")
         prcp = HydroVariable("prcp")
-        lday = HydroVariable("lday")
+        pet = HydroVariable("pet")
         snowpack = HydroVariable("snowpack")
         soilwater = HydroVariable("soilwater")
 
         # --- Define intermediate flux symbols ---
-        rainfall, snowfall, melt, pet, evap, baseflow, surfaceflow, flow = variables(
-            "rainfall, snowfall, melt, pet, evap, baseflow, surfaceflow, flow"
+        rainfall, snowfall, melt, evap, baseflow, surfaceflow, flow = variables(
+            "rainfall, snowfall, melt, evap, baseflow, surfaceflow, flow"
         )
 
         # --- Define the list of equations ---
         fluxes = [
-            Eq(
-                pet,
-                S(29.8)
-                * lday
-                * 24
-                * 0.611
-                * exp((S(17.3) * temp) / (temp + 237.3))
-                / (temp + 273.2),
-            ),
             Eq(rainfall, step_func(Tmin - temp) * prcp),
             Eq(snowfall, step_func(temp - Tmax) * prcp),
             Eq(melt, step_func(temp - Tmax) * Min(snowpack, Df * (temp - Tmax))),

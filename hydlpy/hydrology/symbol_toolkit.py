@@ -4,6 +4,7 @@ Parameters and Variables, with support for metadata and bulk creation.
 """
 
 import sympy
+import torch.nn as nn
 
 class MetaSymbol(sympy.Symbol):
     """
@@ -71,3 +72,18 @@ def variables(names, **kwargs):
     Example: x, y, z = variables('x y z')
     """
     return sympy.symbols(names, cls=HydroVariable, **kwargs)
+
+
+class SympyFunction(nn.Module):
+    """ """
+
+    def __init__(self, func, name=None):
+        super().__init__()
+        self.func = func
+        self.name = name or func.__name__
+
+    def forward(self, *args):
+        return self.func(*args)
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(func={self.name})"
