@@ -1,11 +1,11 @@
-# 训练与评估
+# Training and Evaluation
 
-本节介绍如何用 PyTorch Lightning 训练 DplHydroModel（可选）。
+This section shows how to train `DplHydroModel` with PyTorch Lightning (optional).
 
-## 优化器与损失
+## Optimizer and Loss
 
-- 内置优化器：AdamW（可通过 `optimizer.lr` 配置学习率）
-- 内置损失：MSE（`torchmetrics.MeanSquaredError`），可在自定义训练循环中替换
+- Built-in optimizer: AdamW (set learning rate via `optimizer.lr`)
+- Built-in loss: MSE (`torchmetrics.MeanSquaredError`); replaceable in a custom loop
 
 ```python
 from hydlpy.model import DplHydroModel
@@ -18,7 +18,7 @@ model = DplHydroModel(config)
 opt = model.configure_optimizers()
 ```
 
-## 与 Lightning 集成
+## Lightning Integration
 
 ```python
 import pytorch_lightning as pl
@@ -34,12 +34,12 @@ trainer = pl.Trainer(
 # trainer.fit(model, data_module)
 ```
 
-## 评估与推理
+## Evaluation and Inference
 
-- 使用 `with torch.no_grad(): outputs = model(batch)` 获取推理结果
-- 输出为字典：键为通量名/状态名，例如 `flow`, `soilwater` 等
+- Use `with torch.no_grad(): outputs = model(batch)` for inference
+- Output is a dict: keys are flux/state names such as `flow`, `soilwater`, etc.
 
-## 常见问题
-- 确保数据 batch 的键与形状满足配置要求
-- 训练前先通过小批次验证前向是否稳定
+## Tips
+- Ensure batch keys and shapes satisfy configuration requirements
+- Validate forward stability on a small batch before full training
 

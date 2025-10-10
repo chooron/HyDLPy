@@ -1,21 +1,21 @@
-# 内置物理模型
+# Built-in Hydrology Models
 
-本节列出内置模型与关键参数名，便于编写正确的估计器配置。
+This section lists built-in models and key parameter names to help you configure estimators correctly.
 
 ## ExpHydro
-- 输入名：`[prcp, pet, temp]`
-- 典型参数名：`[Tmin, Tmax, Df, Smax, Qmax, f]`
-  - 可拆分为：
-    - 静态：`[Tmin, Tmax, Df, Smax]`
-    - 动态：`[Qmax, f]`
+- Inputs: `[prcp, pet, temp]`
+- Typical parameters: `[Tmin, Tmax, Df, Smax, Qmax, f]`
+  - Split example:
+    - Static: `[Tmin, Tmax, Df, Smax]`
+    - Dynamic: `[Qmax, f]`
 
 ## HBV
-- 输入名：`[P, Ep, T]`
-- 参考参数名（根据实现）：
+- Inputs: `[P, Ep, T]`
+- Reference parameters (based on implementation):
   - `TT`, `CFMAX`, `CWH`, `CFR`, `FC`, `LP`, `BETA`, `PPERC`, `UZL`, `k0`, `k1`, `k2`
-- 示例拆分：
-  - 静态：`TT, CFMAX, CWH, CFR, FC, LP, BETA, k1, k2, UZL`
-  - 动态：`BETA, PPERC, k0`
-  - 注意：静态与动态合并后须覆盖全部物理参数集合，允许交叉（例如 BETA）
+- Split example:
+  - Static: `TT, CFMAX, CWH, CFR, FC, LP, BETA, k1, k2, UZL`
+  - Dynamic: `BETA, PPERC, k0`
+  - Note: The union of static and dynamic must cover the full hydrology parameter set; overlap is allowed (e.g., BETA)
 
-> 提示：实际参数名以 `hydlpy/hydrology/implements/*.py` 为准，可直接查看源码。
+> Tip: the actual parameter names are defined in `hydlpy/hydrology/implements/*.py`. Check the source for ground truth.

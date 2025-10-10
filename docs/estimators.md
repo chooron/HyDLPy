@@ -1,22 +1,22 @@
-# 估计器（Estimators）
+# Estimators
 
-HyDLPy 提供两类参数估计器：
+HyDLPy provides two types of parameter estimators:
 
-- 静态估计器（StaticEstimator）：从流域属性推断时间不变的参数
-- 动态估计器（DynamicEstimator）：从气象时间序列推断时间变化参数
+- StaticEstimator: infers time-invariant parameters from basin attributes
+- DynamicEstimator: infers time-varying parameters from meteorological time series
 
-两者输出的参数名集合与物理模型参数名集合的并集必须完全一致。
+The union of their output parameter names must equal the hydrology model parameter set.
 
-## 静态估计器
+## Static Estimator
 
-- 配置字段：
+- Config fields:
   - `name`: `mlp` | `direct`
-  - `estimate_parameters`: 列表，输出参数名
-  - `input_names`: 列表，输入属性名
-- 输入形状：`c_nn_norm` 为 `[B, C]`
-- 输出形状：每个参数为 `[B, H]`，其中 `H=hru_num`
+  - `estimate_parameters`: list of output parameter names
+  - `input_names`: list of attribute inputs
+- Input shape: `c_nn_norm` is `[B, C]`
+- Output shape: each parameter is `[B, H]`, where `H=hru_num`
 
-示例：
+Example:
 ```python
 static_cfg = {
     "name": "mlp",
@@ -25,16 +25,16 @@ static_cfg = {
 }
 ```
 
-## 动态估计器
+## Dynamic Estimator
 
-- 配置字段：
+- Config fields:
   - `name`: `lstm`
-  - `estimate_parameters`: 列表，输出参数名
-  - `input_names`: 列表，输入气象名
-- 输入形状：`xc_nn_norm` 为 `[T, B, F]`
-- 输出形状：每个参数为 `[T, B, H]`
+  - `estimate_parameters`: list of output parameter names
+  - `input_names`: list of meteorological inputs
+- Input shape: `xc_nn_norm` is `[T, B, F]`
+- Output shape: each parameter is `[T, B, H]`
 
-示例：
+Example:
 ```python
 dynamic_cfg = {
     "name": "lstm",
@@ -43,6 +43,6 @@ dynamic_cfg = {
 }
 ```
 
-## 常见问题
-- 估计器的参数名请与物理模型参数名严格对齐（静态∪动态=物理参数集合）
-- 输入维度需与 `input_names` 一致
+## FAQ
+- Parameter names must align with hydrology names (static ∪ dynamic = hydrology set)
+- Input dimensions must match `input_names`

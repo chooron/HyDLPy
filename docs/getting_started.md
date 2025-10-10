@@ -1,14 +1,14 @@
-# 快速上手
+# Getting Started
 
-本节将带你用最少的步骤运行 HyDLPy 中的一个混合水文模型（ExpHydro）。
+This section walks you through the minimal steps to run a hybrid hydrological model (ExpHydro) in HyDLPy.
 
-## 安装
+## Installation
 
 ```bash
 pip install hydlpy
 ```
 
-## 基础示例（ExpHydro）
+## Basic Example (ExpHydro)
 
 ```python
 import torch
@@ -19,7 +19,7 @@ config = {
         "name": "exphydro",
         "input_names": ["prcp", "pet", "temp"],
     },
-    # 估计参数（静态∪动态）必须与物理模型参数完全一致
+    # The union of static and dynamic estimated parameters must exactly match the hydrology parameters
     "static_estimator": {
         "name": "mlp",
         "estimate_parameters": ["Tmin", "Tmax", "Df", "Smax"],
@@ -49,9 +49,9 @@ with torch.no_grad():
     print("keys:", list(outputs.keys())[:5])
 ```
 
-## 常见问题
-- 输入键名固定为：`x_phy`, `x_nn_norm`, `xc_nn_norm`, `c_nn_norm`。
-- `input_names` 必须与 `x_phy`/`xc_nn_norm` 的最后一维一致。
-- 估计参数集合（静态∪动态）必须等于物理模型参数集合，否则在构造模型时报错。
+## FAQ
+- Required input keys: `x_phy`, `x_nn_norm`, `xc_nn_norm`, `c_nn_norm`.
+- `input_names` must match the last dimension of `x_phy`/`xc_nn_norm`.
+- The (static ∪ dynamic) estimated parameters must equal the hydrology parameter set, otherwise the model constructor will raise an error.
 
 
