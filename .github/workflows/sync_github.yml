@@ -1,0 +1,60 @@
+name: Sync PyPI → GitHub Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "pyproject.toml"
+  workflow_dispatch:
+
+jobs:
+  sync-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Extract local version from pyproject.toml
+        id: local
+        run: |
+          LOCAL_VERSION=$(grep -E '^version\s*=' pyproject.toml | sed -E 's/version\s*=\s*"(.*)"/\1/')
+          echo "local_version=${LOCAL_VERSION}" >> $GITHUB_OUTPUT
+          echo "📦 Local version: ${LOCAL_VERSION}"
+
+      - name: Get latest version from PyPI
+        id: pypi
+        run: |
+          PACKAGE_NAME="your_package_name"  # ← 改成你在 PyPI 的包名
+          VERSION=$(curl -s https://pypi.org/pypi/${PACKAGE_NAME}/json | jq -r .info.version)
+          echo "pypi_version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "🌐 PyPI version: ${VERSION}"
+
+      - name: Check if GitHub tag exists
+        id: check
+        run: |
+          VERSION=${{ steps.pypi.outputs.pypi_version }}
+          if git ls-remote --tags origin | grep -q "refs/tags/v${VERSION}"; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "ℹ️ Tag v${VERSION} already exists."
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "🚀 New version detected: v${VERSION}"
+          fi
+
+      - name: Create GitHub Release
+        if: steps.check.outputs.exists == 'false' && steps.local.outputs.local_version == steps.pypi.outputs.pypi_version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=${{ steps.pypi.outputs.pypi_version }}
+          echo "🛠 Creating release for v${VERSION}"
+          gh release create "v${VERSION}" \
+            --title "v${VERSION}" \
+            --notes "Auto-synced from PyPI release ${VERSION}"
