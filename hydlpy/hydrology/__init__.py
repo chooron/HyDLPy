@@ -1,4 +1,5 @@
 from .hydrological_model import HydrologicalModel
+from .hydrosymolic_model import HydroSymolicModel
 from .implements import ExpHydro, HBV, XAJ
 from .symbol_toolkit import HydroParameter, HydroVariable, variables, parameters
 
@@ -12,6 +13,7 @@ HYDROLOGY_MODELS = {
 
 __all__ = [
     "HydrologicalModel",
+    "HydroSymolicModel",
     "HydroParameter",
     "HydroVariable",
     "variables",

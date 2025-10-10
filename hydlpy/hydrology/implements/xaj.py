@@ -1,5 +1,5 @@
 # --- Imports ---
-from ..hydrological_model import HydrologicalModel
+from ..hydrosymolic_model import HydroSymolicModel
 from ..symbol_toolkit import HydroParameter, HydroVariable, variables
 from sympy import S, Min, Max, Eq, tanh, log
 
@@ -11,7 +11,7 @@ def step_func(x):
     return (tanh(5.0 * x) + 1.0) * 0.5
 
 
-class XAJ(HydrologicalModel):
+class XAJ(HydroSymolicModel):
     """
     A pre-packaged implementation of the Xinanjiang (XAJ) hydrological model.
 
@@ -19,7 +19,7 @@ class XAJ(HydrologicalModel):
     the complete set of symbols and equations for the XAJ conceptual model.
     """
 
-    def __init__(self, hidden_size: int = 1):
+    def __init__(self, hru_num: int = 1, **kwargs):
         # Step 1: Define all symbols and equations for the XAJ model
         # -----------------------------------------------------------------
 
@@ -137,4 +137,4 @@ class XAJ(HydrologicalModel):
 
         # Step 2: Call the parent class's constructor
         # ----------------------------------------------------
-        super().__init__(fluxes=fluxes, dfluxes=dfluxes, hidden_size=hidden_size)
+        super().__init__(fluxes=fluxes, dfluxes=dfluxes, hru_num=hru_num)

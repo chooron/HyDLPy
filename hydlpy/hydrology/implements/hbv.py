@@ -1,7 +1,7 @@
 # Import the necessary base class and symbolic tools
-from ..hydrological_model import HydrologicalModel
+from ..hydrosymolic_model import HydroSymolicModel
 from ..symbol_toolkit import HydroParameter, HydroVariable, variables
-from sympy import S, Min, Max, Eq, tanh
+from sympy import Min, Max, Eq, tanh
 
 
 # Helper function can be defined at the module level
@@ -10,7 +10,7 @@ def step_func(x):
     return (tanh(5.0 * x) + 1.0) * 0.5
 
 
-class HBV(HydrologicalModel):
+class HBV(HydroSymolicModel):
     """
     A pre-packaged implementation of the HBV hydrological model.
 
@@ -18,7 +18,7 @@ class HBV(HydrologicalModel):
     the complete set of symbols and equations for the HBV conceptual model.
     """
 
-    def __init__(self, hidden_size: int = 1):
+    def __init__(self, hru_num: int = 1, **kwargs):
         # Step 1: Define all symbols and equations for the HBV model
         # -----------------------------------------------------------------
 
@@ -74,19 +74,16 @@ class HBV(HydrologicalModel):
             Eq(snowfall, step_func(TT - T) * P),
             Eq(rainfall, step_func(T - TT) * P),
             # Snow bucket
-            Eq(melt, Min(snowpack, Max(S(0), T - TT) * CFMAX)),
-            Eq(refreeze, Min(max((TT - T), S(0)) * CFR * CFMAX, meltwater)),
-            Eq(infil, Max(S(0), meltwater - snowpack * CWH)),
+            Eq(melt, Min(snowpack, (Max(TT, T) - TT) * CFMAX)),
+            Eq(refreeze, Min((TT - Min(TT, T)) * CFR * CFMAX, meltwater)),
+            Eq(infil, Max(meltwater, snowpack * CWH) - snowpack * CWH),
             # Soil bucket
-            Eq(
-                recharge,
-                (rainfall + infil) * Min(S(1), Max(S(0), (soilwater / FC)) ** BETA),
-            ),
-            Eq(excess, Max(soilwater - FC, S(0))),
-            Eq(evap, Min(S(1), Max(S(0), soilwater / (LP * FC))) * Ep),
+            Eq(recharge, (rainfall + infil) * (Min(FC, soilwater) / FC) ** BETA),
+            Eq(excess, Max(soilwater, FC) - FC),
+            Eq(evap,  Min(LP * FC, soilwater) / (LP * FC) * Ep),
             # Response (Zone) bucket
             Eq(perc, suz * PPERC),
-            Eq(q0, Max(S(0), suz - UZL) * k0),
+            Eq(q0, (Max(suz, UZL) - UZL) * k0),
             Eq(q1, suz * k1),
             Eq(q2, slz * k2),
             Eq(Qt, q0 + q1 + q2),
@@ -103,4 +100,4 @@ class HBV(HydrologicalModel):
 
         # Step 2: Call the parent class's constructor
         # ----------------------------------------------------
-        super().__init__(fluxes=fluxes, dfluxes=dfluxes, hidden_size=hidden_size)
+        super().__init__(fluxes=fluxes, dfluxes=dfluxes, hru_num=hru_num)

@@ -1,7 +1,7 @@
 # Import the necessary base class and symbolic tools
-from ..hydrological_model import HydrologicalModel
+from ..hydrosymolic_model import HydroSymolicModel
 from ..symbol_toolkit import HydroVariable, HydroParameter, variables
-from sympy import S, Min, Max, exp, tanh, Eq
+from sympy import Min, Max, exp, tanh, Eq
 
 
 # Helper function can be defined at the module level
@@ -10,7 +10,7 @@ def step_func(x):
     return (tanh(5.0 * x) + 1.0) * 0.5
 
 
-class ExpHydro(HydrologicalModel):
+class ExpHydro(HydroSymolicModel):
     """
     A pre-packaged, ready-to-use hydrological model with a defined set of equations.
 
@@ -18,7 +18,7 @@ class ExpHydro(HydrologicalModel):
     a specific model structure, simplifying its instantiation and use.
     """
 
-    def __init__(self, hidden_size: int = 1):
+    def __init__(self, hru_num: int = 1, **kwargs):
         # Step 1: Define all symbols and equations for this specific model
         # -----------------------------------------------------------------
 
@@ -63,6 +63,6 @@ class ExpHydro(HydrologicalModel):
 
         # Step 2: Call the parent class's __init__ method
         # ----------------------------------------------------
-        # Pass the now-defined equations and the user-provided hidden_size
+        # Pass the now-defined equations and the user-provided hru_num
         # to the parent engine for analysis and compilation.
-        super().__init__(fluxes=fluxes, dfluxes=dfluxes, hidden_size=hidden_size)
+        super().__init__(fluxes=fluxes, dfluxes=dfluxes, hru_num=hru_num)

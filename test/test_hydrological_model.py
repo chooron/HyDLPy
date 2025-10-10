@@ -9,7 +9,7 @@ import sys
 # Assume the main module is in a discoverable path
 sys.path.append("E:\\PyCode\\HyDLPy")
 from hydlpy.hydrology import (
-    HydrologicalModel,
+    HydroSymolicModel,
     HydroParameter,
     HydroVariable,
     variables,
@@ -78,42 +78,41 @@ def model_equations():
     return fluxes, dfluxes
 
 
-@pytest.mark.parametrize("hidden_size", [1, 16])
-def test_initialization(model_equations, hidden_size):
+@pytest.mark.parametrize("hru_num", [1, 16])
+def test_initialization(model_equations, hru_num):
     """
     Tests model initialization for both single and multiple HRUs.
     This single function replaces test_initialization_single_hru and test_initialization_multi_hru.
     """
-    print(f"\n--- Running Test: Initialization (hidden_size={hidden_size}) ---")
+    print(f"\n--- Running Test: Initialization (hru_num={hru_num}) ---")
     fluxes, dfluxes = model_equations
-    model = HydrologicalModel(fluxes=fluxes, dfluxes=dfluxes, hidden_size=hidden_size)
+    model = HydroSymolicModel(fluxes=fluxes, dfluxes=dfluxes, hru_num=hru_num)
 
-    assert model.hidden_size == hidden_size
-    assert model.Smax.shape == (hidden_size,)
+    assert model.hru_num == hru_num
     assert "snowpack" in model.state_names
     assert "temp" in model.forcing_names
 
 
-@pytest.mark.parametrize("hidden_size", [1, 16])
-def test_core(model_equations, hidden_size):
+@pytest.mark.parametrize("hru_num", [1, 16])
+def test_core(model_equations, hru_num):
     """
     Tests the forward pass using an externally provided parameter tensor.
     This verifies that the model can correctly use parameter values passed at runtime,
     bypassing its internal nn.Parameter members.
     """
     print(
-        f"\n--- Running Test: Forward Pass with External Parameters (hidden_size={hidden_size}) ---"
+        f"\n--- Running Test: Forward Pass with External Parameters (hru_num={hru_num}) ---"
     )
     fluxes, dfluxes = model_equations
-    model = HydrologicalModel(fluxes=fluxes, dfluxes=dfluxes, hidden_size=hidden_size)
+    model = HydroSymolicModel(fluxes=fluxes, dfluxes=dfluxes, hru_num=hru_num)
 
     # 1. Prepare input tensors for states and forcings
-    states = torch.rand(hidden_size, len(model.state_names))
-    forcings = torch.rand(hidden_size, len(model.forcing_names))
+    states = torch.rand(hru_num, len(model.state_names))
+    forcings = torch.rand(hru_num, len(model.forcing_names))
 
     # 2. Create a correctly shaped external parameter tensor to override the model's internal ones
-    # The required shape is (hidden_size, num_parameters)
-    external_params = torch.rand(hidden_size, len(model.parameter_names))
+    # The required shape is (hru_num, num_parameters)
+    external_params = torch.rand(hru_num, len(model.parameter_names))
 
     # 3. Call the model's forward pass, providing the external `parameters` tensor
     output_fluxes, new_states = model._core(
@@ -121,8 +120,8 @@ def test_core(model_equations, hidden_size):
     )
 
     # 4. Assert that the output tensors have the correct shapes
-    expected_fluxes_shape = (hidden_size, len(model.flux_names))
-    expected_states_shape = (hidden_size, len(model.state_names))
+    expected_fluxes_shape = (hru_num, len(model.flux_names))
+    expected_states_shape = (hru_num, len(model.state_names))
 
     assert output_fluxes.shape == expected_fluxes_shape
     assert new_states.shape == expected_states_shape
@@ -133,40 +132,40 @@ def test_core(model_equations, hidden_size):
 
 
 @pytest.mark.parametrize(
-    ("hidden_size", "basin_num"),
+    ("hru_num", "basin_num"),
     [
         (1, 1),
         (16, 12),
     ],
 )
-def test_forward(model_equations, hidden_size, basin_num):
+def test_forward(model_equations, hru_num, basin_num):
     """
     Tests the forward pass using an externally provided parameter tensor.
     This verifies that the model can correctly use parameter values passed at runtime,
     bypassing its internal nn.Parameter members.
     """
     print(
-        f"\n--- Running Test: Forward Pass with External Parameters (hidden_size={hidden_size}) ---"
+        f"\n--- Running Test: Forward Pass with External Parameters (hru_num={hru_num}) ---"
     )
     fluxes, dfluxes = model_equations
-    model = HydrologicalModel(fluxes=fluxes, dfluxes=dfluxes, hidden_size=hidden_size)
+    model = HydroSymolicModel(fluxes=fluxes, dfluxes=dfluxes, hru_num=hru_num)
     time_len= 365
     # 1. Prepare input tensors for states and forcings
-    states = torch.rand(basin_num, hidden_size, len(model.state_names))
-    forcings = torch.rand(time_len, basin_num, hidden_size, len(model.forcing_names))
+    states = torch.rand(basin_num, hru_num, len(model.state_names))
+    forcings = torch.rand(time_len, basin_num, hru_num, len(model.forcing_names))
 
     # 2. Create a correctly shaped external parameter tensor to override the model's internal ones
-    # The required shape is (hidden_size, num_parameters)
+    # The required shape is (hru_num, num_parameters)
     external_params = torch.rand(
-        time_len, basin_num, hidden_size, len(model.parameter_names)
+        time_len, basin_num, hru_num, len(model.parameter_names)
     )
 
     # 3. Call the model's forward pass, providing the external `parameters` tensor
     output_fluxes, new_states = model(forcings, states, external_params)
 
     # 4. Assert that the output tensors have the correct shapes
-    expected_fluxes_shape = (time_len, basin_num, hidden_size, len(model.flux_names))
-    expected_states_shape = (time_len, basin_num, hidden_size, len(model.state_names))
+    expected_fluxes_shape = (time_len, basin_num, hru_num, len(model.flux_names))
+    expected_states_shape = (time_len, basin_num, hru_num, len(model.state_names))
 
     assert output_fluxes.shape == expected_fluxes_shape
     assert new_states.shape == expected_states_shape

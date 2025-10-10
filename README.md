@@ -2,6 +2,7 @@
 
 <div align="center">
 
+
 **🌊 A Python Framework for Building Hybrid Hydrological Models with Deep Learning**
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
@@ -129,39 +130,44 @@ pip install -e .
 ```python
 import torch
 from hydlpy.model import DplHydroModel
-from hydlpy.hydrology.implements import HBV
 
-# Create a simple configuration
+# Create configuration (ExpHydro example)
 config = {
-    "hydrology": {
-        "type": "hbv",
-        "hidden_size": 1
+    "hydrology_model": {
+        "name": "exphydro",
+        "input_names": ["prcp", "pet", "temp"],
     },
-    "routing": {
-        "type": "mean"
+    # Estimated parameters must exactly match hydrology model parameters (static ∪ dynamic)
+    "static_estimator": {
+        "name": "mlp",
+        "estimate_parameters": ["Tmin", "Tmax", "Df", "Smax"],
+        "input_names": ["attr1", "attr2", "attr3", "attr4", "attr5", "attr6"],
     },
-    "optimizer": {
-        "lr": 1e-3
-    }
+    "dynamic_estimator": {
+        "name": "lstm",
+        "estimate_parameters": ["Qmax", "f"],
+        "input_names": ["attr1", "attr2", "attr3"],
+    },
+    "warm_up": 100,
+    "hru_num": 8,
+    "optimizer": {"lr": 1e-3},
 }
 
-# Initialize the model
 model = DplHydroModel(config)
 
-# Prepare sample data
+# Prepare input data (shapes must match input_names)
+time_len, basin_num = 200, 20
 batch = {
-    "x_forcing": {
-        "P": torch.randn(1, 1, 100),  # Precipitation
-        "T": torch.randn(1, 1, 100),  # Temperature
-        "Ep": torch.randn(1, 1, 100)  # Potential evapotranspiration
-    },
-    "y": torch.randn(1, 1, 100)  # Target streamflow
+    "x_phy": torch.rand((time_len, basin_num, 3)),      # [T, B, F]
+    "x_nn_norm": torch.rand((time_len, basin_num, 3)),  # reserved
+    "xc_nn_norm": torch.rand((time_len, basin_num, 3)), # inputs for dynamic estimator
+    "c_nn_norm": torch.rand((basin_num, 6)),            # inputs for static estimator
 }
 
-# Run forward pass
 with torch.no_grad():
-    prediction = model(batch)
-    print(f"Predicted streamflow shape: {prediction['y'].shape}")
+    outputs = model(batch)
+    # outputs is a dict of fluxes and states, e.g. outputs["flow"], outputs["soilwater"]
+    print(list(outputs.keys())[:5])
 ```
 
 ### Building a Custom Hydrological Model
@@ -197,29 +203,25 @@ dfluxes = [
 ]
 
 # Create the model
-model = HydrologicalModel(fluxes=fluxes, dfluxes=dfluxes, hidden_size=16)
+model = HydrologicalModel(fluxes=fluxes, dfluxes=dfluxes, hru_num=16)
 
 # Run the model
-states = torch.randn(16, 2)  # snowpack, soilwater
-forcings = torch.randn(16, 2)  # temp, prcp
+states = torch.randn(16, 2)  # [H, S]
+forcings = torch.randn(16, 2)  # [H, F]
 
-fluxes_out, new_states = model(forcings, states)
+fluxes_out, new_states = model(forcings.unsqueeze(0).unsqueeze(1), states)
 print(f"Fluxes shape: {fluxes_out.shape}")
 print(f"New states shape: {new_states.shape}")
 ```
 
-### Training with PyTorch Lightning
+### Training with PyTorch Lightning (optional)
 
 ```python
 import pytorch_lightning as pl
 from hydlpy.data import HydroDataModule
 
 # Create data module
-data_module = HydroDataModule(
-    data_path="path/to/your/data",
-    batch_size=32,
-    sequence_length=365
-)
+# data_module = HydroDataModule(...)
 
 # Create trainer
 trainer = pl.Trainer(
@@ -229,7 +231,7 @@ trainer = pl.Trainer(
 )
 
 # Train the model
-trainer.fit(model, data_module)
+# trainer.fit(model, data_module)
 ```
 
 ## 📊 Built-in Models
@@ -284,53 +286,6 @@ An experimental model designed for research and development purposes.
 - Configurable parameter bounds
 - Ideal for testing new concepts
 
-## 🛠️ Advanced Features
-
-### Custom Loss Functions
-
-```python
-from hydlpy.criterion import KGEBatchLoss, NSEBatchLoss
-
-# Use Kling-Gupta Efficiency loss
-kge_loss = KGEBatchLoss()
-
-# Use Nash-Sutcliffe Efficiency loss
-nse_loss = NSEBatchLoss()
-```
-
-### Parameter Estimation
-
-```python
-# Static parameter estimation from basin characteristics
-static_config = {
-    "type": "mlp",
-    "input_size": 10,  # Number of basin attributes
-    "hidden_sizes": [64, 32],
-    "param_names": ["FC", "BETA", "k0"]
-}
-
-# Dynamic parameter estimation from meteorological data
-dynamic_config = {
-    "type": "lstm",
-    "input_size": 3,  # P, T, Ep
-    "hidden_size": 32,
-    "param_names": ["CFMAX", "TT"]
-}
-```
-
-### Advanced Routing
-
-```python
-# Differentiable Muskingum-Cunge routing
-routing_config = {
-    "type": "dmc",
-    "variables": {
-        "p": 0.6,  # Wetted perimeter parameter
-        "t": 86400,  # Time step in seconds
-        "x": 0.2  # Storage coefficient
-    }
-}
-```
 
 ## 📚 Documentation
 
@@ -339,39 +294,6 @@ For detailed documentation, examples, and API reference, visit:
 - 📖 [Full Documentation](https://hydlpy.readthedocs.io)
 - 🔬 [Model Building Guide](docs/build_hydrological_model.md)
 - 💡 [Examples and Tutorials](examples/)
-
-## 🤝 Contributing
-
-We welcome contributions to HyDLPy! Here's how you can help:
-
-### 🐛 Bug Reports
-
-- Use the GitHub issue tracker
-- Provide detailed reproduction steps
-- Include system information and error messages
-
-### 💡 Feature Requests
-
-- Open an issue with the "enhancement" label
-- Describe the use case and expected behavior
-- Consider contributing the implementation
-
-### 🔧 Code Contributions
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Add tests for new functionality
-5. Ensure all tests pass (`pytest`)
-6. Commit your changes (`git commit -m 'Add amazing feature'`)
-7. Push to the branch (`git push origin feature/amazing-feature`)
-8. Open a Pull Request
-
-### 📝 Documentation
-
-- Improve existing documentation
-- Add examples and tutorials
-- Fix typos and clarify explanations
 
 ## 📄 License
 

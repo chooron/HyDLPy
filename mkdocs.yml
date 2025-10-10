@@ -1,0 +1,59 @@
+site_name: HyDLPy
+site_description: 基于深度学习的混合水文建模框架
+site_url: https://chooron.github.io/hydlpy/
+repo_name: chooron/hydlpy
+repo_url: https://github.com/chooron/hydlpy
+
+docs_dir: docs
+
+nav:
+  - 入门: getting_started.md
+  - 配置与输入: configuration.md
+  - 估计器: estimators.md
+  - 物理模型: models.md
+  - 训练与评估: training.md
+  - 模型构建指南: build_hydrological_model.md
+
+theme:
+  name: material
+  language: zh
+  features:
+    - navigation.tabs
+    - navigation.top
+    - navigation.tracking
+    - content.code.copy
+    - content.tabs.link
+    - toc.integrate
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: 切换到暗色模式
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - codehilite
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.extra
+  - pymdownx.critic
+  - pymdownx.keys
+  - pymdownx.tabbed:
+      alternate_style: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/chooron/hydlpy

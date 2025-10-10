@@ -1,19 +1,45 @@
+import torch
 from hydlpy.model import DplHydroModel
 
 config = {
-    "hydrology": {
+    "hydrology_model": {
         "name": "exphydro",
-        "hidden_size": 16
+        "input_names": ["prcp", "pet", "temp"],
     },
-    "static_parameter_estimator":{
-        "name": None       
+    "static_estimator": {
+        "name": "mlp",
+        "estimate_parameters": ["Tmin", "Tmax", "Df", "Smax"],
+        "input_names": [
+            "attr1",
+            "attr2",
+            "attr3",
+            "attr4",
+            "attr5",
+            "attr6",
+            "attr7",
+            "attr8",
+            "attr9",
+            "attr10",
+        ],
     },
-    "dynamic_parameter_estimator":{
-        "name": "direct"
+    "dynamic_estimator": {
+        "name": "lstm",
+        "estimate_parameters": ["Qmax", "f"],
+        "input_names": ["prcp", "pet", "temp"],
     },
-    "dynamic_parameter_estimator":{
-        "name": "direct"
-    }
+    "warm_up": 365,
+    "hru_num": 16,
 }
 
-model =  DplHydroModel(config)
+model = DplHydroModel(config)
+
+time_len, basin_num = 730, 100
+
+input_data = {
+    "x_phy": torch.rand((time_len, basin_num, 3)),
+    "x_nn_norm": torch.rand((time_len, basin_num, 3)),
+    "xc_nn_norm": torch.rand((time_len, basin_num, 3)),
+    "c_nn_norm": torch.rand((basin_num, 10)),
+}
+
+output = model(input_data)
