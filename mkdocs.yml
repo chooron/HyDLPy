@@ -1,5 +1,5 @@
 site_name: HyDLPy
-site_description: A hybrid hydrological modeling framework powered by deep learning
+site_description: A hybrid hydrological modeling framework powered by deep learning model
 site_url: https://chooron.github.io/hydlpy/
 repo_name: chooron/hydlpy
 repo_url: https://github.com/chooron/hydlpy
