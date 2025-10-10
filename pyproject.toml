@@ -14,7 +14,7 @@ dependencies = [
     "scipy~=1.16",
     "sympy~=1.14",
     "torch~=2.8",
-]  # Add runtime dependencies here
+]
 
 classifiers = [
     "Programming Language :: Python :: 3",
