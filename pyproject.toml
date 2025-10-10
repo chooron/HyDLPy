@@ -1,6 +1,6 @@
 [project]
 name = "hydlpy"
-version = "0.1.0"
+version = "0.1.1"
 description = "Hydrology modeling with Deep Learning in Python"
 authors = [
     { name = "Xin Jing", email = "jingxin0107@qq.com" }
