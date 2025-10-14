@@ -20,7 +20,7 @@ class HydrologicalModel(nn.Module):
         parameter_bounds: Dict[str, Tuple[float, float]],
         flux_calculator: Callable,
         state_updater: Callable,
-        dtype: torch.dtype=torch.float32,
+        dtype: torch.dtype = torch.float32,
         input_names: Optional[List[str]] = None,
     ) -> None:
         super().__init__()
@@ -31,32 +31,50 @@ class HydrologicalModel(nn.Module):
         self.forcing_names = forcing_names
         self.parameter_names = parameter_names
         self.flux_names = flux_names
-        self.input_names = input_names
+        self.input_names = input_names if input_names is not None else forcing_names
         self.parameter_bounds = parameter_bounds
 
         self.flux_calculator = flux_calculator
         self.state_updater = state_updater
 
-        # 索引映射
-        self.flux_map: Dict[str, int] = {name: i for i, name in enumerate(self.flux_names)}
-        self.state_map: Dict[str, int] = {name: i for i, name in enumerate(self.state_names)}
+        self.flux_map: Dict[str, int] = {
+            name: i for i, name in enumerate(self.flux_names)
+        }
+        self.state_map: Dict[str, int] = {
+            name: i for i, name in enumerate(self.state_names)
+        }
 
         self._initialize_parameters()
 
-    def _initialize_parameters(self) -> None:
-        """初始化可训练参数边界缓存张量。"""
-        min_bounds_list: List[float] = []
-        max_bounds_list: List[float] = []
-        for name in self.parameter_names:
-            bounds = self.parameter_bounds.get(name)
-            if bounds is None:
-                raise ValueError(f"Parameter '{name}' must have bounds provided.")
+    def _initialize_parameters(self):
+        """Initializes trainable parameters and pre-computes boundary tensors."""
+        min_bounds_list = []
+        max_bounds_list = []
+        for s in self.parameter_symbols:
+            bounds = s.get_bounds() or (0.0, 1.0)
+            initial_value = s.get_default()
+            if initial_value is None:
+                raise ValueError(
+                    f"Parameter '{s.name}' must have a 'default' value provided."
+                )
+            self.parameter_bounds[s.name] = bounds
             min_b, max_b = bounds
             min_bounds_list.append(min_b)
             max_bounds_list.append(max_b)
+            initial_tensor = torch.full(
+                (self.hidden_size,), float(initial_value), dtype=torch.float32
+            )
+            unconstrained_values = torch.logit(
+                (initial_tensor - min_b) / (max_b - min_b)
+            )
+            setattr(self, s.name, nn.Parameter(unconstrained_values))
 
-        self.register_buffer("min_bounds", torch.tensor(min_bounds_list, dtype=self.dtype))
-        self.register_buffer("max_bounds", torch.tensor(max_bounds_list, dtype=self.dtype))
+        self.register_buffer(
+            "min_bounds", torch.tensor(min_bounds_list, dtype=torch.float32)
+        )
+        self.register_buffer(
+            "max_bounds", torch.tensor(max_bounds_list, dtype=torch.float32)
+        )
 
     def _get_initial_state(self) -> torch.Tensor:
         """
@@ -107,7 +125,7 @@ class HydrologicalModel(nn.Module):
 
     def _process_parameters(
         self,
-        parameters: torch.Tensor,
+        parameters: Optional[torch.Tensor],
         forcings_shape: Tuple[int, int, int, int],
         device: torch.device,
     ) -> torch.Tensor:
@@ -125,12 +143,19 @@ class HydrologicalModel(nn.Module):
         T, B, H, F = forcings_shape
         expected_dynamic_shape = (T, B, H, len(self.parameter_names))
         expected_static_shape = (B, H, len(self.parameter_names))
+        if parameters is None:
+            parameters = torch.stack(
+                [getattr(self, name) for name in self.parameter_names], dim=-1
+            )
+            parameters = parameters.unsqueeze(0).repeat(B, 1, 1)
+
         if (parameters.shape != expected_dynamic_shape) & (
             parameters.shape != expected_static_shape
         ):
             raise ValueError(
                 f"Provided parameters have shape {parameters.shape}, "
-                + f"but expected dynamic shape: {expected_dynamic_shape} or static shape: {expected_static_shape}"
+                + f"but expected dynamic shape: {expected_dynamic_shape} "
+                + f"or static shape: {expected_static_shape}"
             )
         # Apply transformations (e.g., sigmoid) to ensure parameters are in a valid range
         transformed_parameters = self._transform_parameters(parameters)

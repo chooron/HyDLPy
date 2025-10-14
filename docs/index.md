@@ -27,34 +27,6 @@
 - **📈 Comprehensive Metrics**: Multiple loss functions and evaluation metrics for hydrological modeling
 - **🔌 PyTorch Lightning Integration**: Easy training, validation, and deployment workflows
 
-## 🏗️ Architecture
-
-HyDLPy follows a modular architecture that allows for flexible combination of different components:
-
-```mermaid
-graph TB
-    A[Input Data] --> B[Static Parameter Estimator]
-    A --> C[Dynamic Parameter Estimator]
-    A --> D[Hydrology Core]
-    B --> D
-    C --> D
-    D --> E[Routing Module]
-    E --> F[Streamflow Prediction]
-    
-    subgraph "Neural Components"
-        B
-        C
-    end
-    
-    subgraph "Physics-Based Core"
-        D
-    end
-    
-    subgraph "Routing"
-        E
-    end
-```
-
 ### Core Components
 
 #### 🔬 **Hydrology Core**
