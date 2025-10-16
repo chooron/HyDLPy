@@ -50,24 +50,14 @@ class HydrologicalModel(nn.Module):
         """Initializes trainable parameters and pre-computes boundary tensors."""
         min_bounds_list = []
         max_bounds_list = []
-        for s in self.parameter_symbols:
-            bounds = s.get_bounds() or (0.0, 1.0)
-            initial_value = s.get_default()
-            if initial_value is None:
-                raise ValueError(
-                    f"Parameter '{s.name}' must have a 'default' value provided."
-                )
-            self.parameter_bounds[s.name] = bounds
+        for name in self.parameter_names:
+            bounds = self.parameter_bounds.get(name, (0.0, 1.0))
             min_b, max_b = bounds
             min_bounds_list.append(min_b)
             max_bounds_list.append(max_b)
-            initial_tensor = torch.full(
-                (self.hidden_size,), float(initial_value), dtype=torch.float32
-            )
-            unconstrained_values = torch.logit(
-                (initial_tensor - min_b) / (max_b - min_b)
-            )
-            setattr(self, s.name, nn.Parameter(unconstrained_values))
+
+            normalized_init = torch.full((self.hru_num,), 0.5, dtype=torch.float32)
+            setattr(self, name, nn.Parameter(normalized_init))
 
         self.register_buffer(
             "min_bounds", torch.tensor(min_bounds_list, dtype=torch.float32)
@@ -190,14 +180,29 @@ class HydrologicalModel(nn.Module):
             - torch.Tensor: The time series of calculated fluxes.
             - torch.Tensor: The time series of simulated states.
         """
+        if len(forcings.shape) == 2:
+            forcings_expand = (
+                forcings.unsqueeze(1).unsqueeze(2).repeat(1, 1, self.hru_num, 1)
+            )
+        elif len(forcings.shape) == 3:
+            if forcings.shape[1] == self.hru_num:
+                forcings_expand = forcings.unsqueeze(1)
+            elif (
+                forcings.shape[1] != self.hru_num
+            ):  # warn 这里可能存在输入的数据维度与hru num不一致
+                forcings_expand = forcings.unsqueeze(2).repeat(1, 1, self.hru_num, 1)
+        elif len(forcings.shape) == 4:
+            forcings_expand = forcings
+        else:
+            raise ValueError(f"Unsupport forcings shape: {forcings.shape}")
         # time step, basin num, hru num, feature dim
-        T, B, H, F = forcings.shape
+        T, B, H, F = forcings_expand.shape
 
         # Correctly get device from an existing tensor
-        device = forcings.device
+        device = forcings_expand.device
 
         transformed_parameters = self._process_parameters(
-            parameters, forcings.shape, device
+            parameters, forcings_expand.shape, device
         )
 
         fluxes_placeholder = torch.zeros((T, B, H, len(self.flux_names)), device=device)
@@ -211,10 +216,30 @@ class HydrologicalModel(nn.Module):
 
         for i in range(T):
             fluxes_, states_ = self._core(
-                forcings[i, :, :, :], current_states, transformed_parameters[i, :, :, :]
+                forcings_expand[i, :, :, :],
+                current_states,
+                transformed_parameters[i, :, :, :],
             )
             fluxes_placeholder[i, :, :, :] = fluxes_
             states_placeholder[i, :, :, :] = states_
             current_states = states_  # Update states for the next iteration
 
+        if len(forcings.shape) == 2:
+            return (
+                torch.mean(fluxes_placeholder, dim=2).squeeze(1),
+                torch.mean(states_placeholder, dim=2).squeeze(1),
+            )
+        elif len(forcings.shape) == 3:
+            if forcings.shape[1] == self.hru_num:
+                return (
+                    fluxes_placeholder.squeeze(1),
+                    states_placeholder.squeeze(1),
+                )
+            elif (
+                forcings.shape[1] != self.hru_num
+            ):  # warn 这里可能存在输入的数据维度与hru num不一致
+                return (
+                    torch.mean(fluxes_placeholder, dim=2),
+                    torch.mean(states_placeholder, dim=2),
+                )
         return fluxes_placeholder, states_placeholder
